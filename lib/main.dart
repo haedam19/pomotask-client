@@ -8,23 +8,10 @@ import 'package:pomotask_client/timer_service.dart';
 // App 전체에서 사용되는 Data와 객체
 late String serverAddress;
 late String loggedInUser;
-late PomodoroTimer timer;
 
 void main() {
   loadConfig();
-  timer = PomodoroTimer(
-    focusDuration: Duration(minutes: 25),
-    shortBreakDuration: Duration(minutes: 5),
-    longBreakDuration: Duration(minutes: 15),
-    longBreakInterval: 4,
-    onTick: (session, remaining) {
-      // setState로 UI 타이머 텍스트·슬라이드바 갱신
-    },
-    onSessionComplete: (session) {
-      // 서버로 기록 전송(API 호출)
-    }
-  );
-  
+
   WidgetsFlutterBinding.ensureInitialized();
   // 데스크톱 환경에서 창 최소 크기 설정(800×600)
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
@@ -268,56 +255,91 @@ class _SignUpPageState extends State<SignUpPage>
   }
 }
 
-class MainPage extends StatefulWidget
-{
+class MainPage extends StatefulWidget {
   const MainPage({Key? key}) : super(key: key);
 
   @override
-  State<MainPage> createState() => _MainPageState();
+  _MainPageState createState() => _MainPageState();
 }
 
-class _MainPageState extends State<MainPage>
-{
-  SessionType _selectedSession = SessionType.focus;
-  bool _isRunning = false;
+class _MainPageState extends State<MainPage> {
+  late PomodoroTimer _pomoTimer;
 
-  Duration _focusDuration      = Duration(minutes: 25);
-  Duration _shortBreakDuration = Duration(minutes: 5);
-  Duration _longBreakDuration  = Duration(minutes: 15);
+  // UI에 표시할 현재 세션, 남은 시간, 그리고 타이머 상태
+  late SessionType _uiSession;
+  late Duration    _uiRemaining;
+  late TimerState  _uiTimerState;
 
-  String _formatDuration(Duration d)
-  {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final minutes = twoDigits(d.inMinutes.remainder(60));
-    final seconds = twoDigits(d.inSeconds.remainder(60));
-    return '$minutes:$seconds';
+  @override
+  void initState() {
+    super.initState();
+
+    // 1) PomodoroTimer 인스턴스 생성 & 콜백 바인딩
+    _pomoTimer = PomodoroTimer(
+      focusDuration:      const Duration(minutes: 1),
+      shortBreakDuration: const Duration(minutes: 1),
+      longBreakDuration:  const Duration(minutes: 1),
+      longBreakInterval:  4,
+      onTick: (session, remaining, state) {
+        setState(() {
+          _uiSession    = session;
+          _uiRemaining  = remaining;
+          _uiTimerState = state;
+        });
+      },
+      onSessionComplete: (session) {
+        // TODO: 서버에 완료 내역 전송
+      },
+    );
+
+    // 2) 초기 UI state 세팅
+    _uiSession    = _pomoTimer.currentSession;
+    _uiRemaining  = _pomoTimer.remaining;
+    _uiTimerState = _pomoTimer.state;
   }
 
   @override
-  Widget build(BuildContext context)
-  {
-    const Color backgroundColor       = Color(0xFFF3E5F5);
-    const Color activeButtonColor     = Color(0xFF7E57C2);
-    final   Color inactiveButtonColor = Colors.grey.shade400;
+  void dispose() {
+    // 타이머가 돌고 있다면 해제
+    _pomoTimer.dispose();
+    super.dispose();
+  }
 
-    final Duration currentDuration =
-    _selectedSession == SessionType.focus
-        ? _focusDuration
-        : _selectedSession == SessionType.shortBreak
-            ? _shortBreakDuration
-            : _longBreakDuration;
+  String _formatDuration(Duration d) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final m = twoDigits(d.inMinutes.remainder(60));
+    final s = twoDigits(d.inSeconds.remainder(60));
+    return '$m:$s';
+  }
+
+  int _totalSecondsFor(SessionType s) {
+    switch (s) {
+      case SessionType.focus:
+        return _pomoTimer.focusDuration.inSeconds;
+      case SessionType.shortBreak:
+        return _pomoTimer.shortBreakDuration.inSeconds;
+      case SessionType.longBreak:
+        return _pomoTimer.longBreakDuration.inSeconds;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const bgcolor        = Color(0xFFF3E5F5);
+    const activeColor    = Color(0xFF7E57C2);
+    final inactiveColor  = Colors.grey.shade400;
+
+    final totalSec = _totalSecondsFor(_uiSession);
+    final progress = _uiRemaining.inSeconds / totalSec;
 
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: bgcolor,
       body: Row(
         children: [
-          // 좌측 고정 사이드바 공간
-          Container(
-            width: 350,
-            color: Colors.transparent,
-          ),
+          // 고정된 사이드바 공간
+          Container(width: 350, color: Colors.transparent),
 
-          // 우측 메인 컨텐츠
+          // 메인 컨텐츠
           Expanded(
             child: SingleChildScrollView(
               child: Align(
@@ -327,132 +349,134 @@ class _MainPageState extends State<MainPage>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
-                      // Settings 버튼 (배경 흰색, 글자 보라색)
+                      // Settings
                       Padding(
                         padding: const EdgeInsets.only(right: 24),
                         child: Align(
                           alignment: Alignment.centerRight,
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: activeButtonColor,
-                              foregroundColor: Colors.white,
+                              backgroundColor: Colors.white,
+                              foregroundColor: activeColor,
                               shape: const StadiumBorder(),
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 24, vertical: 12),
                             ),
-                            onPressed: ()
-                            {
-                              // TODO: 설정 팝업 호출
+                            onPressed: () {
+                              // TODO: 설정 팝업
                             },
                             child: const Text('Settings'),
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 48),
 
-                      // Session 선택 버튼 (폭 고정)
+                      // 세션 버튼
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _buildSessionButton(
-                            label: 'Focus',
-                            isActive: _selectedSession == SessionType.focus,
-                            activeColor: activeButtonColor,
-                            inactiveColor: inactiveButtonColor,
-                            onTap: ()
-                            {
-                              setState(() {
-                                _selectedSession = SessionType.focus;
-                              });
-                            },
-                          ),
-                          const SizedBox(width: 13),
-                          _buildSessionButton(
-                            label: 'Short Break',
-                            isActive:
-                                _selectedSession == SessionType.shortBreak,
-                            activeColor: activeButtonColor,
-                            inactiveColor: inactiveButtonColor,
-                            onTap: ()
-                            {
-                              setState(() {
-                                _selectedSession = SessionType.shortBreak;
-                              });
-                            },
-                          ),
-                          const SizedBox(width: 13),
-                          _buildSessionButton(
-                            label: 'Long Break',
-                            isActive:
-                                _selectedSession == SessionType.longBreak,
-                            activeColor: activeButtonColor,
-                            inactiveColor: inactiveButtonColor,
-                            onTap: ()
-                            {
-                              setState(() {
-                                _selectedSession = SessionType.longBreak;
-                              });
-                            },
-                          ),
-                        ],
+                        children: SessionType.values.map((type) {
+                          final label = {
+                            SessionType.focus: 'Focus',
+                            SessionType.shortBreak: 'Short Break',
+                            SessionType.longBreak: 'Long Break',
+                          }[type]!;
+                          final isActive = _uiSession == type;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: SizedBox(
+                              width: 120,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                      isActive ? activeColor : inactiveColor,
+                                  foregroundColor:
+                                      isActive ? Colors.white : Colors.black87,
+                                  shape: const StadiumBorder(),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
+                                  elevation: 0,
+                                ),
+                                onPressed: () {
+                                  _pomoTimer.skipSessionByButton(type);
+                                },
+                                child: Text(label),
+                              ),
+                            ),
+                          );
+                        }).toList(),
                       ),
-
                       const SizedBox(height: 32),
 
                       // 타이머 텍스트
                       Text(
-                        _formatDuration(currentDuration),
+                        _formatDuration(_uiRemaining),
                         style: const TextStyle(
                           fontSize: 96,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
                       ),
-
                       const SizedBox(height: 16),
 
-                      // 진행도 슬라이드 바
+                      // 진행도 바
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 48),
                         child: LinearProgressIndicator(
                           minHeight: 4,
                           backgroundColor: Colors.white,
-                          value: 1.0, // TODO: 진행도에 맞춰 value 변경
+                          value: progress.clamp(0.0, 1.0),
                         ),
                       ),
-
                       const SizedBox(height: 32),
 
-                      // Start / Pause 버튼
+                      // Start / Pause / Resume 버튼
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: activeButtonColor,
+                          backgroundColor: activeColor,
                           foregroundColor: Colors.white,
                           shape: const StadiumBorder(),
                           padding: const EdgeInsets.symmetric(
                               horizontal: 48, vertical: 16),
                         ),
                         icon: Icon(
-                          _isRunning ? Icons.pause : Icons.play_arrow,
+                          _uiTimerState == TimerState.running
+                              ? Icons.pause
+                              : Icons.play_arrow,
                           size: 28,
                         ),
                         label: Text(
-                          _isRunning ? 'Pause' : 'Start',
+                          _uiTimerState == TimerState.running
+                              ? 'Pause'
+                              : (_uiTimerState == TimerState.paused
+                                  ? 'Resume'
+                                  : 'Start'),
                           style: const TextStyle(fontSize: 20),
                         ),
-                        onPressed: ()
-                        {
-                          setState(() {
-                            _isRunning = !_isRunning;
-                          });
-                          // TODO: 타이머 start/pause 로직
+                        onPressed: () {
+                          switch (_pomoTimer.state) {
+                            case TimerState.idle:
+                              _pomoTimer.start();
+                              setState(() {
+                                _uiTimerState = TimerState.running;
+                              });
+                              break;
+                            case TimerState.running:
+                              _pomoTimer.pause();
+                              setState(() {
+                                _uiTimerState = TimerState.paused;
+                              });
+                              break;
+                            case TimerState.paused:
+                              _pomoTimer.resume();
+                              setState(() {
+                                _uiTimerState = TimerState.running;
+                              });
+                              break;
+                          }
                         },
                       ),
 
                       const SizedBox(height: 64),
-
-                      // In Focus 제목
                       const Text(
                         'In Focus',
                         style: TextStyle(
@@ -461,17 +485,14 @@ class _MainPageState extends State<MainPage>
                           color: Colors.black87,
                         ),
                       ),
-
                       const SizedBox(height: 24),
 
-                      // In Focus 리스트 (외형만)
+                      // In Focus 리스트 외형
                       _buildInFocusItem('Task 1'),
                       _buildInFocusItem('Task 2'),
-
-                      // 새 항목 추가 버튼
+                      const SizedBox(height: 8),
                       Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 24, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: Container(
                           height: 60,
                           decoration: BoxDecoration(
@@ -481,9 +502,8 @@ class _MainPageState extends State<MainPage>
                           child: Center(
                             child: IconButton(
                               icon: const Icon(Icons.add, size: 32),
-                              onPressed: ()
-                              {
-                                // TODO: 새 In Focus 항목 추가
+                              onPressed: () {
+                                // TODO: 항목 추가
                               },
                             ),
                           ),
@@ -500,34 +520,7 @@ class _MainPageState extends State<MainPage>
     );
   }
 
-  // 세션 버튼 빌더 (폭 고정, 선택 시 글자 흰색)
-  Widget _buildSessionButton({
-    required String label,
-    required bool isActive,
-    required Color activeColor,
-    required Color inactiveColor,
-    required VoidCallback onTap,
-  })
-  {
-    return SizedBox(
-      width: 120, // Short Break 버튼 폭에 맞춤
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isActive ? activeColor : inactiveColor,
-          foregroundColor: isActive ? Colors.white : Colors.black87,
-          shape: const StadiumBorder(),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          elevation: 0,
-        ),
-        onPressed: onTap,
-        child: Text(label),
-      ),
-    );
-  }
-
-  // In Focus 항목 빌더 (변경 없음)
-  Widget _buildInFocusItem(String title)
-  {
+  Widget _buildInFocusItem(String title) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Container(
@@ -550,14 +543,8 @@ class _MainPageState extends State<MainPage>
                 ),
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () { /* TODO */ },
-            ),
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () { /* TODO */ },
-            ),
+            IconButton(icon: const Icon(Icons.edit), onPressed: () {}),
+            IconButton(icon: const Icon(Icons.close), onPressed: () {}),
           ],
         ),
       ),
