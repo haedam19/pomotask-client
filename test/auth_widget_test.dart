@@ -13,11 +13,11 @@ void main() {
         findsOneWidget,
       );
 
-      // ElevatedButton 형태의 회원가입 버튼 확인
+      // 회원가입 버튼 확인
       final signUpBtn = find.widgetWithText(ElevatedButton, '회원가입');
       expect(signUpBtn, findsOneWidget);
 
-      // 탭 시 SignUpPage로 이동
+      // 회원가입 버튼 클릭 시 SignUpPage로 이동
       await tester.tap(signUpBtn);
       await tester.pumpAndSettle();
 
@@ -42,7 +42,7 @@ void main() {
       );
 
       // 유효한 입력값 채우기
-      await tester.enterText(find.byType(TextField).at(0), 'test@example.com');
+      await tester.enterText(find.byType(TextField).at(0), 'testID');
       await tester.enterText(find.byType(TextField).at(1), 'password123');
       await tester.enterText(find.byType(TextField).at(2), 'password123');
 
@@ -58,6 +58,7 @@ void main() {
     });
   });
 
+  // 이 부분은 추후 구현
   group('SignUpPage 폼 유효성 검사', () {
     testWidgets('입력 없이 제출 시 필수 입력 에러 메시지 표시', (WidgetTester tester) async {
       await tester.pumpWidget(const MaterialApp(home: SignUpPage()));
@@ -73,7 +74,7 @@ void main() {
     testWidgets('비밀번호와 확인이 일치하지 않을 때 에러 메시지 표시', (WidgetTester tester) async {
       await tester.pumpWidget(const MaterialApp(home: SignUpPage()));
 
-      await tester.enterText(find.byType(TextField).at(0), 'test@example.com');
+      await tester.enterText(find.byType(TextField).at(0), 'testID');
       await tester.enterText(find.byType(TextField).at(1), 'password123');
       await tester.enterText(find.byType(TextField).at(2), 'different');
 
