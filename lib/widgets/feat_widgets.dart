@@ -18,12 +18,6 @@ class _MainPageState extends State<MainPage>
   late Duration     _uiRemaining;
   late TimerState   _uiTimerState;
 
-  final List<String> _taskGroups = [
-    'Full Stack Service Programming',
-    'Game Graphic Programming',
-    'Game Interactive Technology',
-  ];
-
   @override
   void initState()
   {
@@ -124,7 +118,6 @@ class _MainPageState extends State<MainPage>
         children: [
           Sidebar(
             username: loggedInUser,
-            taskGroups: _taskGroups,
             onLogout: ()
             {
               // TODO: 로그아웃 처리
@@ -363,20 +356,16 @@ class _MainPageState extends State<MainPage>
   }
 }
 
-class Sidebar extends StatelessWidget
-{
-  final String             username;
-  final List<String>       taskGroups;
-  final VoidCallback       onLogout;
-  final VoidCallback       onSelectPomodoro;
-  final VoidCallback       onSelectInFocus;
-  final ValueChanged<String> onSelectTaskGroup;
+class Sidebar extends StatefulWidget {
+  final String            username;
+  final VoidCallback      onLogout;
+  final VoidCallback      onSelectPomodoro;
+  final VoidCallback      onSelectInFocus;
+  final ValueChanged<int> onSelectTaskGroup;
 
-  const Sidebar(
-  {
+  const Sidebar({
     Key? key,
     required this.username,
-    required this.taskGroups,
     required this.onLogout,
     required this.onSelectPomodoro,
     required this.onSelectInFocus,
@@ -384,11 +373,110 @@ class Sidebar extends StatelessWidget
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context)
-  {
+  State<Sidebar> createState() => _SidebarState();
+}
+
+class _SidebarState extends State<Sidebar> {
+  List<Map<String, dynamic>> _taskLists = [];
+  bool _loading = true; // 서버로부터 Task Group 가져오는 중
+  bool _isAdding  = false; // 새 Task Group 추가 중
+  final TextEditingController _newNameController = TextEditingController(); // 새 Task Group 이름 입력
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTaskLists();
+  }
+
+  Future<void> _fetchTaskLists() async {
+    final lists = await api_service.fetchUserTaskLists(
+      serverAddress, widget.username);
+    setState(() {
+      _taskLists = lists;
+      _loading = false;
+    });
+  }
+
+  Future<void> _createAndRefresh(String name) async {
+    // 서버에 새 Task Group 생성
+    await api_service.createTaskList(
+      server: serverAddress,
+      username: widget.username,
+      title: name);
+    // 다시 목록 동기화
+    await _fetchTaskLists();
+    // 추가 모드 종료
+    setState(() {
+      _isAdding = false;
+      _newNameController.clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     const backgroundColor = Color(0xFFFBF7FD);
     const iconColor       = Color(0xFF7E57C2);
     const textColor       = Colors.black87;
+
+    // Task Group 리스트 섹션
+    Widget groupSection = _loading
+        ? const Center(child: CircularProgressIndicator())
+        : ListView.builder(
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _taskLists.length,
+            itemBuilder: (context, idx) {
+              final item = _taskLists[idx];
+              return ListTile(
+                leading: const Icon(Icons.folder, color: textColor),
+                horizontalTitleGap: 10,
+                title: Text(
+                  item['name'],
+                  style: const TextStyle(fontSize: 14, color: textColor),
+                ),
+                onTap: () => widget.onSelectTaskGroup(item['id']),
+              );
+            },
+          );
+
+    // 새 Task Group 추가 버튼 또는 입력창
+    Widget addButtonOrField = _isAdding
+        ? Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            child: TextField(
+              controller: _newNameController,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: '새 Task Group 이름 입력',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+              ),
+              style: const TextStyle(fontSize: 14, color: textColor),
+              onSubmitted: (value) {
+                if (value.trim().isNotEmpty) {
+                  _createAndRefresh(value.trim());
+                } else {
+                  setState(() => _isAdding = false);
+                }
+              },
+            ),
+          )
+        : GestureDetector(
+            onTap: () => setState(() => _isAdding = true),
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Center(
+                child: Icon(Icons.add, size: 24, color: iconColor),
+              ),
+            ),
+          );
 
     return Container(
       width: 350,
@@ -397,50 +485,55 @@ class Sidebar extends StatelessWidget
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── 상단: 사용자 정보 + 로그아웃
           Row(
             children: [
-              Icon(
-                Icons.account_circle,
-                size: 40,
-                color: iconColor,
-              ),
-              const SizedBox(width: 12),
+              Icon(Icons.account_circle, size: 40, color: iconColor),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  username,
+                  widget.username,
                   style: const TextStyle(
-                    fontSize: 18,
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: textColor,
                   ),
                 ),
               ),
               IconButton(
-                onPressed: onLogout,
+                onPressed: widget.onLogout,
                 icon: const Icon(Icons.logout),
                 color: iconColor,
               ),
             ],
           ),
-
           const SizedBox(height: 32),
 
+          // ── 네비게이션: Pomodoro
           ListTile(
             leading: const Icon(Icons.timer),
-            title: const Text('Pomodoro'),
             horizontalTitleGap: 10,
-            onTap: onSelectPomodoro,
+            title: const Text(
+              'Pomodoro',
+              style: TextStyle(fontSize: 14),
+            ),
+            onTap: widget.onSelectPomodoro,
           ),
 
+          // ── 네비게이션: In Focus
           ListTile(
             leading: const Icon(Icons.list),
-            title: const Text('In Focus'),
             horizontalTitleGap: 10,
-            onTap: onSelectInFocus,
+            title: const Text(
+              'In Focus',
+              style: TextStyle(fontSize: 14),
+            ),
+            onTap: widget.onSelectInFocus,
           ),
 
           const Divider(),
 
+          // ── Task Group 헤더
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Text(
@@ -453,24 +546,14 @@ class Sidebar extends StatelessWidget
             ),
           ),
 
-          Expanded(
-            child: ListView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: taskGroups.length,
-              itemBuilder: (context, idx)
-              {
-                final name = taskGroups[idx];
-                return ListTile(
-                  leading: const Icon(Icons.folder),
-                  title: Text(name),
-                  horizontalTitleGap: 10,
-                  onTap: () => onSelectTaskGroup(name),
-                );
-              },
-            ),
-          ),
+          // ── Task Group 리스트
+          Expanded(child: groupSection),
+
+          // ── 새 Task Group 추가
+          addButtonOrField,
         ],
       ),
     );
   }
+
 }
