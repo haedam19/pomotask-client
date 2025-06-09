@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pomotask_client/main.dart';
+import 'package:pomotask_client/widgets/auth_widgets.dart';
 
 void main() {
   group('LoginPage 네비게이션 테스트', () {
