@@ -11,6 +11,7 @@ class LoginPage extends StatefulWidget
   State<LoginPage> createState() => _LoginPageState();
 }
 
+// 서버 연결 완료
 class _LoginPageState extends State<LoginPage>
 {
   final TextEditingController _idController = TextEditingController();
@@ -24,17 +25,25 @@ class _LoginPageState extends State<LoginPage>
     super.dispose();
   }
 
-  void _handleLogin()
+  void _handleLogin() async
   {
     final id = _idController.text;
     final password = _passwordController.text;
 
-    debugPrint('[LOGIN] 아이디: $id, 비밀번호: $password');
-    loggedInUser = id;
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const MainPage()),
-    );
+    final success = await api_service.signIn(serverAddress, id, password);
+    if (success)
+    {
+      debugPrint('[LOGIN] 아이디: $id, 비밀번호: $password');
+      loggedInUser = id;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const MainPage()),
+      );
+    }
+    else
+    {
+      debugPrint('⚠️ 로그인 실패: 아이디 또는 비밀번호가 잘못되었습니다.');
+    }
   }
 
   void _handleSignUp(BuildContext context)
@@ -116,7 +125,6 @@ class _LoginPageState extends State<LoginPage>
   }
 }
 
-
 class SignUpPage extends StatefulWidget
 {
   const SignUpPage({Key? key}) : super(key: key);
@@ -125,6 +133,7 @@ class SignUpPage extends StatefulWidget
   State<SignUpPage> createState() => _SignUpPageState();
 }
 
+// 서버 연결 완료
 class _SignUpPageState extends State<SignUpPage>
 {
   final TextEditingController _idController = TextEditingController();
@@ -155,7 +164,7 @@ class _SignUpPageState extends State<SignUpPage>
     final success = await api_service.signUp(serverAddress, id, password);
     if (success)
     {
-      debugPrint('[SIGNIN] 아이디: $id, 비밀번호: $password');
+      debugPrint('[SIGNUP] 아이디: $id, 비밀번호: $password');
       Navigator.pop(context);
     }
     else

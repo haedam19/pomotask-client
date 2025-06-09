@@ -39,7 +39,7 @@ Future<bool> signIn(String serverAddress, String username, String password) asyn
   }
 }
 
-Future<void> recordSession({
+Future<bool> recordSession({
   required String serverAddress,
   required String username,
   required String sessionType,
@@ -59,9 +59,11 @@ Future<void> recordSession({
   );
 
   if (response.statusCode == 200) {
-    print('\n세션 기록 전송 완료');
+    debugPrint('\n세션 기록 전송 완료');
+    return true;
   } else {
-    print('\n세션 기록 실패: ${response.statusCode}');
+    debugPrint('\n세션 기록 실패: ${response.statusCode}');
+    return false;
   }
 }
 

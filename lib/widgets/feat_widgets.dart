@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pomotask_client/main.dart';
 import 'package:pomotask_client/timer_service.dart';
-
+import 'package:pomotask_client/api_service.dart' as api_service;
 
 class MainPage extends StatefulWidget
 {
@@ -43,9 +43,29 @@ class _MainPageState extends State<MainPage>
           _uiTimerState = state;
         });
       },
-      onSessionComplete: (session)
+      onSessionComplete: (session) async
       {
-        // TODO: 서버에 완료 내역 전송
+        if (session == SessionType.focus)
+        {
+          final success = await api_service.recordSession(
+            serverAddress: serverAddress,
+            username: loggedInUser,
+            sessionType: session.name,
+            // 통계를 위해 시작 시간은 현재 시간에서 세션 시간을 뺀 값이라고 추정
+            startTime: DateTime.now().subtract(_pomoTimer.focusDuration), 
+            endTime: DateTime.now()
+          );
+
+          if (success)
+          {
+            debugPrint('[SESSION COMPLETE] $loggedInUser completed a $session session. '
+              '(${_pomoTimer.focusDuration.inMinutes} minutes)');
+          }
+          else
+          {
+            debugPrint('⚠️ Failed to record session for $loggedInUser');
+          }
+        }
       },
     );
 
