@@ -122,6 +122,7 @@ Future<bool> addTaskToList({
   required String server,
   required int listId,
   required String title,
+  required String description,
   required int order,
 }) async {
   final uri = Uri.parse('$server/task/list/$listId/task');
@@ -129,6 +130,7 @@ Future<bool> addTaskToList({
     headers: {'Content-Type': 'application/json'},
     body: jsonEncode({
       'title': title,
+      'description': description,
       'order': order,
     }),
   );
@@ -142,10 +144,28 @@ Future<bool> deleteTask(String server, int taskId) async {
 }
 
 Future<bool> updateTaskTitle(String server, int taskId, String newTitle) async {
-  final uri = Uri.parse('\$server/task/task/\$taskId');
+  final uri = Uri.parse('\$server/task/task/$taskId');
   final response = await http.put(uri,
     headers: {'Content-Type': 'application/json'},
     body: jsonEncode({'title': newTitle}),
   );
+  return response.statusCode == 200;
+}
+
+Future<bool> updateTask(String server, int taskId, String newTitle, String newDescription) async {
+  final uri = Uri.parse('$server/task/task/$taskId');
+  final response = await http.put(uri,
+    headers: {'Content-Type': 'application/json'},
+    body: jsonEncode({
+      'title': newTitle,
+      'description': newDescription,
+    }),
+  );
+  return response.statusCode == 200;
+}
+
+Future<bool> deleteTaskList(String server, int listId) async {
+  final uri = Uri.parse('$server/task/list/$listId');
+  final response = await http.delete(uri);
   return response.statusCode == 200;
 }
